@@ -2,71 +2,51 @@ import discord
 from discord.ext import commands
 import io
 import os
-import math
 import random
 import asyncio
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-# --- إعدادات البوت ---
+# 1. إعداد البوت
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# --- إعدادات العجلة ---
-WHEEL_SIZE = 700
-COLORS = ["#e74c3c", "#3498db", "#2ecc71", "#f1c40f", "#9b59b6", "#1abc9c", "#e67e22", "#34495e", "#ff6b9d", "#00d2d3"]
-
-def get_font(size):
-    return ImageFont.load_default() # استخدام الخط الافتراضي لضمان عدم وجود أخطاء مسارات
-
-def draw_wheel(players, rotation_deg=0):
-    size = WHEEL_SIZE
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+# 2. إعدادات العجلة (رسم بسيط بدون الحاجة لخطوط خارجية)
+def draw_wheel(players, rotation=0):
+    img = Image.new("RGBA", (700, 700), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    center = size // 2
-    radius = size // 2 - 15
     n = len(players)
-    angle_per = 360 / n
-    bbox = [center - radius, center - radius, center + radius, center + radius]
-    
+    angle = 360 / n
     for i in range(n):
-        start = rotation_deg + i * angle_per - 90
-        end = start + angle_per
-        draw.pieslice(bbox, start, end, fill=COLORS[i % len(COLORS)], outline="white", width=2)
-        
-    draw.polygon([(center - 20, 8), (center + 20, 8), (center, 50)], fill="#FF3B3B")
+        draw.pieslice([50, 50, 650, 650], rotation + i*angle, rotation + (i+1)*angle, 
+                      fill=["#e74c3c", "#3498db", "#2ecc71", "#f1c40f"][i % 4], outline="white")
     return img
 
+# 3. نظام اللعبة
 class RouletteView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=60)
+        super().__init__(timeout=None)
         self.players = []
         self.started = False
 
-    def build_embed(self):
-        desc = f"المشاركون ({len(self.players)}):\n" + "\n".join([p.name for p in self.players])
-        return discord.Embed(title="🎡 روليت الحظ", description=desc, color=discord.Color.gold())
-
     @discord.ui.button(label="انضم للعبة", style=discord.ButtonStyle.success)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.started: return
         if interaction.user not in self.players:
             self.players.append(interaction.user)
-            await interaction.response.edit_message(embed=self.build_embed())
+            await interaction.response.send_message(f"{interaction.user.name} انضم!", ephemeral=True)
             if len(self.players) == 1:
                 await interaction.channel.send("⏳ ستبدأ اللعبة تلقائياً بعد 15 ثانية!")
                 await asyncio.sleep(15)
                 if not self.started and len(self.players) >= 2:
-                    await self.start_game(interaction)
+                    await self.start_game(interaction.channel)
 
-    async def start_game(self, interaction):
+    async def start_game(self, channel):
         self.started = True
-        msg = await interaction.channel.send("🎡 العجلة تدور...")
+        msg = await channel.send("🎡 العجلة تدور...")
         winner = random.choice(self.players)
-        for i in range(8):
-            img = draw_wheel(self.players, rotation_deg=i*90)
+        for i in range(5):
             buf = io.BytesIO()
-            img.save(buf, format="PNG")
+            draw_wheel(self.players, rotation=i*72).save(buf, format="PNG")
             buf.seek(0)
             await msg.edit(content="🎡 جاري التدوير...", attachments=[discord.File(buf, "wheel.png")])
             await asyncio.sleep(0.5)
@@ -74,12 +54,8 @@ class RouletteView(discord.ui.View):
 
 @bot.command()
 async def روليت(ctx):
-    view = RouletteView()
-    await ctx.send(embed=view.build_embed(), view=view)
+    await ctx.send("🎡 اضغط الزر للبدء:", view=RouletteView())
 
-# --- تشغيل البوت ---
+# 4. تشغيل
 token = os.environ.get("DISCORD_TOKEN")
-if token:
-    bot.run(token)
-else:
-    print("يرجى ضبط DISCORD_TOKEN في الـ Secrets")
+bot.run(token)
