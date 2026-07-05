@@ -13,9 +13,12 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="/", intents=intents)
 
+bot = commands.Bot(command_prefix="/", intents=intents)
+
 @bot.event
 async def setup_hook():
     await bot.load_extension("roulette_cog")
+    await bot.load_extension("buckshot_cog")
     
 MAX_MSG_LEN = 1900  # حد أمان أقل من 2000 حرف اللي يفرضه ديسكورد
 
