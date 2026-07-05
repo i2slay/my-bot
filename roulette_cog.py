@@ -11,25 +11,27 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# 2. إعدادات العجلة (رسم بسيط بدون الحاجة لخطوط خارجية)
+# 2. رسم العجلة
 def draw_wheel(players, rotation=0):
     img = Image.new("RGBA", (700, 700), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     n = len(players)
     angle = 360 / n
+    colors = ["#e74c3c", "#3498db", "#2ecc71", "#f1c40f"]
     for i in range(n):
         draw.pieslice([50, 50, 650, 650], rotation + i*angle, rotation + (i+1)*angle, 
-                      fill=["#e74c3c", "#3498db", "#2ecc71", "#f1c40f"][i % 4], outline="white")
+                      fill=colors[i % 4], outline="white")
     return img
 
 # 3. نظام اللعبة
 class RouletteView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)
+        super().__init__(timeout=None) # دائم
         self.players = []
         self.started = False
 
-    @discord.ui.button(label="انضم للعبة", style=discord.ButtonStyle.success)
+    # الخطأ كان هنا: يجب إضافة custom_id للأزرار في الـ Persistent Views
+    @discord.ui.button(label="انضم للعبة", style=discord.ButtonStyle.success, custom_id="roulette_join_btn")
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user not in self.players:
             self.players.append(interaction.user)
@@ -56,6 +58,9 @@ class RouletteView(discord.ui.View):
 async def روليت(ctx):
     await ctx.send("🎡 اضغط الزر للبدء:", view=RouletteView())
 
-# 4. تشغيل
+# 4. تشغيل آمن
 token = os.environ.get("DISCORD_TOKEN")
-bot.run(token)
+if token:
+    bot.run(token)
+else:
+    print("خطأ: لم يتم العثور على DISCORD_TOKEN في الـ Secrets!")
