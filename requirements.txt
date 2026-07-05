@@ -1,2 +1,5 @@
 discord.py
 requests
+Pillow
+arabic_reshaper
+python-bidi
