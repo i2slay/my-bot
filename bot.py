@@ -103,4 +103,81 @@ class DynamicCodeButton(discord.ui.View):
                 
         except Exception:
             error = traceback.format_exc()
-            await interaction.followup.send(f"❌ **حدث خطأ أثناء التنفيذ:**\n```py\n{error}\n
+            # هنا تم إصلاح الخطأ المذكور في ملف image_1b0a79.png ليكون متصل وسليم
+            await interaction.followup.send(f"❌ **حدث خطأ أثناء التنفيذ:**\n```py\n{error}\n```", ephemeral=True)
+
+
+# --- [ القسم الثالث: أحداث وأوامر البوت ] ---
+
+@bot.event
+async def on_ready():
+    print(f"تم تشغيل البوت بنجاح باسم: {bot.user}")
+    # تفعيل لوحة التحكم بشكل دائم حتى لو رست البوت
+    bot.add_view(ControlPanelView())
+
+# 1. أمر استدعاء لوحة التحكم بالأزرار الجاهزة
+@bot.command(name="لوحة")
+@commands.is_owner()
+async def send_panel(ctx):
+    """يرسل لوحة التحكم المليئة بالأزرار لإدارة البوت"""
+    embed = discord.Embed(
+        title="🎛️ لوحة التحكم المطلقة للبوت",
+        description="اضغط على الأزرار أدناه للتحكم بالبوت وإدارته فوراً بدون كتابة أوامر.",
+        color=discord.Color.dark_theme()
+    )
+    await ctx.send(embed=embed, view=ControlPanelView())
+
+# 2. أمر البرمجة والتنفيذ المباشر
+@bot.command(name="برمج")
+@commands.is_owner()
+async def execute_code(ctx, *, code: str):
+    """يكتب ويشغل أكواد بايثون مباشرة من الشات"""
+    if code.startswith("```") and code.endswith("```"):
+        code = code.strip("`").strip()
+        if code.startswith("py\n"): code = code[3:]
+        elif code.startswith("python\n"): code = code[7:]
+
+    str_obj = io.StringIO()
+    env = {
+        'bot': bot, 'ctx': ctx, 'channel': ctx.channel, 
+        'author': ctx.author, 'guild': ctx.guild, 
+        'discord': discord, 'os': os, 'sys': sys
+    }
+    env['print'] = lambda *args, **kwargs: print(*args, file=str_obj, **kwargs)
+
+    formatted_code = "\n".join(f"    {line}" for line in code.splitlines())
+    exec_text = f"async def __ex(ctx):\n{formatted_code}"
+    
+    try:
+        exec(exec_text, env)
+        with contextlib.redirect_stdout(str_obj):
+            result = await env["__ex"](ctx)
+            
+        output = str_obj.getvalue()
+        if output:
+            await ctx.send(f"✅ **تم التنفيذ! المخرجات:**\n```py\n{output}\n```")
+        elif result is not None:
+            await ctx.send(f"✅ **تم التنفيذ! النتيجة المسترجعة:**\n```py\n{result}\n```")
+        else:
+            await ctx.send("✅ **تم تشغيل الكود بنجاح في الخلفية!**")
+            
+    except Exception:
+        error = traceback.format_exc()
+        await ctx.send(f"❌ **حدث خطأ أثناء التنفيذ:**\n```py\n{error}\n```")
+
+# 3. أمر تحويل الأكواد إلى أزرار تفاعلية
+@bot.command(name="اصنع_زر")
+@commands.is_owner()
+async def create_button_command(ctx, *, code: str):
+    """تكتب له كود، فيصنع لك زر داخل الشات يشغل هذا الكود عند الضغط عليه!"""
+    if code.startswith("```") and code.endswith("```"):
+        code = code.strip("`").strip()
+        if code.startswith("py\n"): code = code[3:]
+        elif code.startswith("python\n"): code = code[7:]
+
+    view = DynamicCodeButton(code, ctx.author.id)
+    await ctx.send("⚙️ **تم إنشاء زر برمجي مخصص لكودك بنجاح! اضغط أدناه لتشغيله:**", view=view)
+
+
+# تشغيل البوت
+bot.run(os.environ.get("DISCORD_TOKEN"))
